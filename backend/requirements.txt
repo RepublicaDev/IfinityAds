@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+motor
+firebase-admin
+youtube-transcript-api
+httpx
+python-dotenv
+pydantic
+beautifulsoup4
