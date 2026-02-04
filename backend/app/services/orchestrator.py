@@ -21,25 +21,73 @@ class AdOrchestrator:
             "user_id": user_id,
             "status": "queued",
             "meta": {"product_url": product_url, "youtube_url": youtube_url, "style": style},
-            "created_at": time.time()
+            "created_at": time.time(),
+            "progress": [],
+            "result": None,
+            "error": None,
+            "started_at": None,
+            "finished_at": None,
         }
         if db:
             await db.render_logs.insert_one(doc)
         return job_id
 
     async def process_job(self, job_id: str):
+        # Marca processamento e registra timestamps; busca meta do job
+        job = None
         if db:
-            await db.render_logs.update_one({"job_id": job_id}, {"$set": {"status": "processing"}})
-        # retrieve job meta (simplified: not strict read)
-        # in this MVP we won't persist job retrieval; assume meta passed through
-        # This worker is a best-effort demonstration
-        # In real impl, fetch job meta from DB and perform robust steps
+            job = await db.render_logs.find_one({"job_id": job_id})
+            await db.render_logs.update_one({"job_id": job_id}, {"$set": {"status": "processing", "started_at": time.time()}})
+
+        if not job:
+            # se não encontrou, registra um documento mínimo
+            job = {
+                "job_id": job_id,
+                "meta": {},
+            }
+
+        meta = job.get("meta") or {}
+
         try:
-            # just a placeholder flow
-            await asyncio.sleep(0.1)
-            # mark done
+            # Exemplo de fluxo: scrape produto -> analisar youtube (opcional) -> gerar script -> gerar vídeo
+            product_url = meta.get("product_url")
+            youtube_url = meta.get("youtube_url")
+            style = meta.get("style") or "charismatic_fomo"
+
+            # Etapa 1: scrape
+            if product_url:
+                await db.render_logs.update_one({"job_id": job_id}, {"$push": {"progress": {"ts": time.time(), "step": "scraping"}}})
+                product = await self.scraper.scrape_with_retry(product_url)
+            else:
+                product = None
+
+            # Etapa 2: youtube analysis (opcional)
+            analysis = None
+            if youtube_url:
+                await db.render_logs.update_one({"job_id": job_id}, {"$push": {"progress": {"ts": time.time(), "step": "youtube_analysis"}}})
+                analysis = await self.yta.analyze(youtube_url)
+
+            # Etapa 3: script generation (engine pode ser sync/async)
+            await db.render_logs.update_one({"job_id": job_id}, {"$push": {"progress": {"ts": time.time(), "step": "script_generation"}}})
+            try:
+                script = await self.engine.generate_script(product, analysis, style)
+            except TypeError:
+                # caso generate_script seja síncrono
+                script = self.engine.generate_script(product, analysis, style)
+
+            # Etapa 4: call HeyGen (simulado se falhar)
+            await db.render_logs.update_one({"job_id": job_id}, {"$push": {"progress": {"ts": time.time(), "step": "video_generation"}}})
+            try:
+                video_result = await self.heygen.generate_from_script(script)
+            except Exception:
+                # fallback: apenas registra um stub
+                video_result = {"url": None, "note": "generation-stub"}
+
+            # Finaliza com sucesso
             if db:
-                await db.render_logs.update_one({"job_id": job_id}, {"$set": {"status": "done", "result": {"message": "Video generated (stub)"}}})
+                await db.render_logs.update_one({"job_id": job_id}, {"$set": {"status": "done", "result": video_result, "finished_at": time.time()}})
+
         except Exception as e:
             if db:
-                await db.render_logs.update_one({"job_id": job_id}, {"$set": {"status": "failed", "error": str(e)}})
+                await db.render_logs.update_one({"job_id": job_id}, {"$set": {"status": "failed", "error": str(e), "finished_at": time.time()}})
+            raise

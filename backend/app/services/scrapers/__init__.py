@@ -1,20 +1,24 @@
-"""
-Interface abstrata para Scrapers de Produtos.
-Design: Strategy Pattern com type hints forte.
-"""
-from abc import ABC, abstractmethod
-from typing import Optional
-from app.models.product import Product, Marketplace
-from tenacity import retry, stop_after_attempt, wait_exponential
 import logging
+import asyncio
+from abc import ABC, abstractmethod
+from typing import Optional, Dict, Type
+
+# Importações de modelo (Certifique-se que esses caminhos existem)
+from app.models.product import Product, Marketplace
+
+# Use a lib real. Adicione 'tenacity' no requirements.txt
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 logger = logging.getLogger(__name__)
 
+class ScraperError(Exception):
+    """Exceção base para erros de scraping."""
+    pass
 
 class BaseScraper(ABC):
     """
     Interface abstrata para todos os scrapers.
-    Define contrato que cada marketplace deve implementar.
+    Design: Strategy Pattern.
     """
     
     marketplace: Marketplace = None
@@ -23,78 +27,52 @@ class BaseScraper(ABC):
     
     @abstractmethod
     async def scrape(self, url: str) -> Product:
-        """
-        Scrapa um único produto da URL.
-        
-        Args:
-            url: URL absoluta do produto
-            
-        Returns:
-            Product: Objeto unificado de produto
-            
-        Raises:
-            ScraperError: Falha na extração
-        """
+        """Implementação específica de cada marketplace."""
         pass
     
     @abstractmethod
     def validate_url(self, url: str) -> bool:
-        """Valida se URL pertence a este marketplace."""
+        """Valida se a URL pertence ao marketplace."""
         pass
     
     async def scrape_with_retry(self, url: str) -> Product:
         """
-        Scrapa com retry automático e backoff exponencial.
+        Executa o scrape com lógica de retry. 
+        Note que o decorador agora é aplicado via chamada funcional 
+        para aceitar parâmetros dinâmicos de 'self'.
         """
+        
         @retry(
             stop=stop_after_attempt(self.max_retries),
-            wait=wait_exponential(multiplier=1, min=2, max=10)
+            wait=wait_exponential(multiplier=1, min=2, max=10),
+            retry=retry_if_exception_type((ScraperError, Exception)),
+            reraise=True
         )
-        async def _scrape():
+        async def _execute_with_retry():
             return await self.scrape(url)
         
         try:
-            return await _scrape()
+            return await _execute_with_retry()
         except Exception as e:
-            logger.error(f"Scrape falhou após {self.max_retries} tentativas: {e}")
-            raise
-
-
-class ScraperError(Exception):
-    """Exceção base para erros de scraping."""
-    pass
-
+            logger.error(f"Falha crítica no marketplace {self.marketplace}: {e}")
+            raise ScraperError(f"Erro ao processar {url} após retentativas.")
 
 class ScraperRegistry:
     """
-    Registro centralizado de scrapers por marketplace.
-    Design: Factory pattern.
+    Registro centralizado (Factory Pattern).
     """
-    _scrapers: dict[Marketplace, type[BaseScraper]] = {}
+    # Corrigido o type hint para ser mais explícito
+    _scrapers: Dict[Marketplace, Type[BaseScraper]] = {}
     
     @classmethod
-    def register(cls, marketplace: Marketplace, scraper_class: type[BaseScraper]):
-        """Registra um novo scraper."""
+    def register(cls, marketplace: Marketplace, scraper_class: Type[BaseScraper]):
         cls._scrapers[marketplace] = scraper_class
-        logger.info(f"✓ Scraper registrado: {marketplace.value}")
-    
-    @classmethod
-    def get_scraper(cls, marketplace: Marketplace) -> Optional[BaseScraper]:
-        """Obtém instância do scraper para um marketplace."""
-        if marketplace not in cls._scrapers:
-            return None
-        return cls._scrapers[marketplace]()
+        logger.info(f"✓ Scraper registrado: {marketplace}")
     
     @classmethod
     def get_scraper_for_url(cls, url: str) -> Optional[BaseScraper]:
-        """Encontra e retorna scraper apropriado para URL."""
         for scraper_class in cls._scrapers.values():
-            scraper = scraper_class()
-            if scraper.validate_url(url):
-                return scraper
+            instance = scraper_class()
+            if instance.validate_url(url):
+                return instance
         return None
-    
-    @classmethod
-    def list_marketplaces(cls) -> list[Marketplace]:
-        """Lista todos os marketplaces registrados."""
-        return list(cls._scrapers.keys())

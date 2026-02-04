@@ -4,12 +4,14 @@ FastAPI application with lifespan management and advanced architecture
 """
 from app.core.app import create_app
 from app.api.v1 import router as api_router
+from app.api.v2 import router as api_v2_router
 
 # Criar aplicação com gerenciamento de lifespan
 app = create_app()
 
 # Incluir routers
 app.include_router(api_router, prefix="/api/v1", tags=["v1"])
+app.include_router(api_v2_router, prefix="/api/v2", tags=["v2"])
 
 # CORS (opcional, descomentar se frontend em domínio diferente)
 # from fastapi.middleware.cors import CORSMiddleware

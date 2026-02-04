@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Optional, Generic, TypeVar, Type
 from datetime import timedelta
-from aioredis import Redis, from_url
+from redis.asyncio import Redis, from_url
 from pydantic import BaseModel
 import os
 
