@@ -1,4 +1,5 @@
 .env
+.env.example
 firebase-key.json
 node_modules/
 __pycache__/
