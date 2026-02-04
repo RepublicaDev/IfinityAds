@@ -11,7 +11,7 @@ from app.models.product import (
     Product, ProductPrice, ProductImage, ProductAttribute,
     ProductMetadata, Marketplace
 )
-from app.services.scrapers import BaseScraper, ScraperError
+from . import BaseScraper, ScraperError
 import logging
 
 logger = logging.getLogger(__name__)
