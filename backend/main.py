@@ -1,7 +1,30 @@
-from fastapi import FastAPI
+"""
+InfinityAd Backend - Main Entry Point
+FastAPI application with lifespan management and advanced architecture
+"""
+from app.core.app import create_app
 from app.api.v1 import router as api_router
 
-app = FastAPI(title="InfinityAd AI - Backend")
-app.include_router(api_router, prefix="/api/v1")
+# Criar aplicação com gerenciamento de lifespan
+app = create_app()
 
-# For development: uvicorn backend.main:app --reload --port 8000
+# Incluir routers
+app.include_router(api_router, prefix="/api/v1", tags=["v1"])
+
+# CORS (opcional, descomentar se frontend em domínio diferente)
+# from fastapi.middleware.cors import CORSMiddleware
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["http://localhost:5173", "https://seu-frontend.com"],
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        log_level="info"
+    )
