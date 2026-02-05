@@ -1,10 +1,12 @@
+import os
 from motor.motor_asyncio import AsyncIOMotorClient
-from app.core.config import MONGO_URI
+from dotenv import load_dotenv
 
-db = None
-if MONGO_URI:
-    client = AsyncIOMotorClient(MONGO_URI)
-    db = client.get_default_database()
-else:
-    # For tests or missing config fallback to None
-    db = None
+load_dotenv()
+
+MONGO_URI = os.getenv("MONGO_URI")
+# O nome do banco pode ser extraído da URI ou definido aqui
+DB_NAME = "infinity_ads" 
+
+client = AsyncIOMotorClient(MONGO_URI)
+db = client[DB_NAME]
