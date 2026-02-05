@@ -3,7 +3,7 @@ import { healthApi } from './services/api'
 import { useAppStore } from './stores/appStore'
 import ProductScraper from './features/ProductScraper'
 import YouTubeAnalyzer from './features/YouTubeAnalyzer'
-import './App.css'
+import './styles.css'
 
 function App() {
   const { error, success, clearMessages } = useAppStore()

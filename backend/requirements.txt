@@ -1,16 +1,24 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-motor==3.3.2
-firebase-admin==6.2.0
-youtube-transcript-api==0.6.1
-httpx==0.25.2
-python-dotenv==1.0.0
-pydantic==2.5.0
+# Core API
+fastapi==0.109.2
+uvicorn[standard]==0.27.1
+pydantic==2.6.1
 pydantic-settings==2.1.0
-beautifulsoup4==4.12.2
-redis==5.0.1
-aioredis==2.0.1
-celery==5.3.4
-lxml==4.9.3
+
+# Database & Auth
+motor==3.3.2
+firebase-admin==6.4.0
+
+# Scraping & Tools
+youtube-transcript-api==0.6.1
+beautifulsoup4==4.12.3
+lxml==5.1.0
 requests==2.31.0
+httpx==0.26.0
+
+# Cache & Tasks
+redis==5.0.1
+celery==5.3.6
 tenacity==8.2.3
+
+# Utils
+python-dotenv==1.0.1

@@ -3,7 +3,7 @@
  * Component para scrapear e exibir informações de produtos
  */
 import React, { useState } from 'react'
-import { Input, Button, Card } from '../components'
+import { Input, Button, Card, AdGenerator } from '../components'
 import { productApi } from '../services/api'
 import { useAppStore } from '../stores/appStore'
 
