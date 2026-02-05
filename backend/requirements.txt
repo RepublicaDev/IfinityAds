@@ -7,7 +7,7 @@ pydantic-settings==2.7.1
 # --- Database & Auth ---
 # Motor 3.6.0+ é necessário para evitar o erro '_QUERY_OPTIONS' no Python 3.12
 motor==3.6.0
-pymongo==4.10.1
+pymongo==4.9.1
 firebase-admin==6.6.0
 
 # --- Scraping & Tools ---
