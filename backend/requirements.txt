@@ -1,24 +1,26 @@
-# Core API
-fastapi==0.109.2
-uvicorn[standard]==0.27.1
-pydantic==2.6.1
-pydantic-settings==2.1.0
+# --- Core API ---
+fastapi==0.115.8
+uvicorn[standard]==0.34.0
+pydantic==2.10.6
+pydantic-settings==2.7.1
 
-# Database & Auth
-motor==3.3.2
-firebase-admin==6.4.0
+# --- Database & Auth ---
+# Motor 3.6.0+ é necessário para evitar o erro '_QUERY_OPTIONS' no Python 3.12
+motor==3.6.0
+pymongo==4.10.1
+firebase-admin==6.6.0
 
-# Scraping & Tools
-youtube-transcript-api==0.6.1
-beautifulsoup4==4.12.3
-lxml==5.1.0
-requests==2.31.0
-httpx==0.26.0
+# --- Scraping & Tools ---
+youtube-transcript-api==0.6.3
+beautifulsoup4==4.13.3
+lxml==5.3.1
+requests==2.32.3
+httpx==0.28.1
 
-# Cache & Tasks
-redis==5.0.1
-celery==5.3.6
-tenacity==8.2.3
+# --- Cache & Tasks ---
+redis==5.2.1
+celery==5.4.0
+tenacity==9.0.0
 
-# Utils
+# --- Utils ---
 python-dotenv==1.0.1
