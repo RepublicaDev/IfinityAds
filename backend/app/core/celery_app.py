@@ -9,6 +9,8 @@ celery_app = Celery(
     backend=os.getenv("CELERY_RESULT_BACKEND") or REDIS_URL,
 )
 
+celery_app.autodiscover_tasks(['app.core'], force=True)
+
 # Configurações mínimas recomendadas
 celery_app.conf.update(
     task_serializer="json",

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from app.core.auth import get_current_user
 from app.services.orchestrator import AdOrchestrator
-from app.tasks import process_job_task
+from backend.app.core.tasks import process_job_task
 import logging
 
 logger = logging.getLogger(__name__)
