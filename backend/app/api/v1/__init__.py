@@ -1,67 +1,49 @@
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import HttpUrl
-from typing import List
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 import logging
 
-# Importando os serviços
+# Importações absolutas
 from app.services.product_service import ProductScraperService
 from app.services.youtube_analyzer import YouTubeAnalyzer
-from app.models.product import BulkProductResponse
+from app.models.product import ProductResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Instanciamos os serviços uma vez para uso nos endpoints
-product_service = ProductScraperService()
-youtube_analyzer = YouTubeAnalyzer()
+# --- MODELOS DE DADOS ---
+class ScrapeRequest(BaseModel):
+    url: str
+    bypass_cache: bool = False
 
-# ============ ENDPOINTS DE PRODUTOS ============
+class YoutubeRequest(BaseModel):
+    youtube_url: str
+    force_reanalysis: bool = False
 
-@router.post("/products/scrape")
-async def scrape_single_product(
-    url: str = Query(...), 
-    bypass_cache: bool = Query(False)
-):
+# --- ENDPOINTS ---
+
+@router.post("/products/scrape", response_model=ProductResponse)
+async def scrape_single_product(data: ScrapeRequest):
     try:
-        # Usando a instância para acessar o método
-        product = await product_service.scrape_product(url, bypass_cache=bypass_cache)
-        return product_service.to_response(product)
-    except Exception as e:
-        logger.error(f"Erro no scrape individual: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-@router.post("/products/batch", response_model=BulkProductResponse)
-async def scrape_products_batch(
-    urls: List[HttpUrl],
-    bypass_cache: bool = Query(False)
-):
-    if len(urls) > 10:
-        raise HTTPException(status_code=400, detail="Máximo 10 URLs")
-    
-    try:
-        # Se o método batch não existir no service, usamos o scrape individual em loop
-        # Isso evita o erro de "Atributo Desconhecido" do Pylance
-        results = []
-        for url in urls:
-            p = await product_service.scrape_product(str(url), bypass_cache=bypass_cache)
-            results.append(product_service.to_response(p))
-            
-        return BulkProductResponse(
-            total=len(results), 
-            products=results, 
-            cache_hit=False
+        product = await ProductScraperService.scrape_product(
+            url=data.url, 
+            bypass_cache=data.bypass_cache
         )
+        return ProductScraperService.to_response(product)
     except Exception as e:
-        logger.error(f"Erro no batch scrape: {e}")
+        logger.error(f"Erro no endpoint scrape: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
-
-# ============ ENDPOINTS DE YOUTUBE ============
 
 @router.post("/youtube/analyze")
-async def analyze_video(url: str = Query(...)):
+async def analyze_video(data: YoutubeRequest):
     try:
-        # Usando a instância definida no topo
-        return await youtube_analyzer.analyze(url)
+        analyzer = YouTubeAnalyzer()
+        
+        # AJUSTE PARA EVITAR O ERRO DO PYLANCE:
+        # Se o seu YouTubeAnalyzer não aceita force_reanalysis ainda,
+        # passamos apenas a URL. 
+        result = await analyzer.analyze(data.youtube_url)
+        
+        return result
     except Exception as e:
-        logger.error(f"Erro ao analisar YouTube: {e}")
+        logger.error(f"Erro no endpoint youtube: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))

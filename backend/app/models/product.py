@@ -10,6 +10,7 @@ class Marketplace(str, Enum):
     SHEIN = "shein"
     AMAZON = "amazon"
     CUSTOM = "custom"
+    GENERIC = "generic"
 
 class ProductPrice(BaseModel):
     amount: float = Field(..., gt=0)
