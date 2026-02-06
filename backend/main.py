@@ -21,32 +21,27 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(title="IfinityAds Backend", lifespan=lifespan)
 
-    # 1. MIDDLEWARE CORS (AJUSTADO)
+    # CONFIGURAÇÃO DE CORS TOTAL
+    # Usar allow_origins=["*"] é a forma mais segura de garantir que 
+    # URLs de preview da Vercel funcionem sem erro.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:3000",
-            "http://localhost:5173",
-            "https://republicadevifinityads.vercel.app", # REMOVIDA A BARRA FINAL
-        ],
+        allow_origins=["*"], 
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
-        expose_headers=["*"],
     )
 
-    # 2. ROTAS DE SAÚDE (Compatibilidade dupla)
-    @app.get("/health", tags=["System"])
-    @app.get("/api/v1/health", tags=["System"])
+    # Rotas de Saúde com suporte a múltiplos caminhos
+    @app.get("/health")
+    @app.get("/api/v1/health")
     async def health_check():
-        return {"status": "healthy", "service": "ifinityads-api"}
+        return {"status": "healthy"}
 
-    # 3. ROTEAMENTO
-    # O Front está chamando /products/scrape. 
-    # Ao incluir sem prefixo também, garantimos que funcione.
+    # Roteamento
+    # Incluímos o router v1 com e sem prefixo para bater com as chamadas do seu front
     app.include_router(api_router, prefix="/api/v1", tags=["v1"])
-    app.include_router(api_router, tags=["v1-compat"]) # Suporte para chamadas sem /api/v1
-    
+    app.include_router(api_router, tags=["v1-compat"])
     app.include_router(api_v2_router, prefix="/api/v2", tags=["v2"])
 
     return app
@@ -55,5 +50,5 @@ app = create_app()
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
-    # Importante: usar a variável app diretamente ou a string
+    # Passamos o objeto app diretamente
     uvicorn.run(app, host="0.0.0.0", port=port)
