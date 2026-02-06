@@ -36,7 +36,7 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=[
             "http://localhost:3000",
-            "ifinity-ads-git-main-republicadevs-projects.vercel.app",
+            "https://republicadevifinityads.vercel.app/",
         ],
         allow_credentials=True,
         allow_methods=["*"],
