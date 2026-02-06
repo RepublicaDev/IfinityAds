@@ -1,58 +1,50 @@
 import httpx
 from bs4 import BeautifulSoup
-from typing import Dict, Any
-from app.models.product import (
-    Product, ProductPrice, ProductMetadata, Marketplace
-)
-from .base import BaseScraper, ScraperError, ScraperRegistry # <--- IMPORTANTE
-import logging
-
-logger = logging.getLogger(__name__)
+from .base import BaseScraper, ScraperError, ScraperRegistry
+from app.models.product import Product, ProductPrice, ProductMetadata, Marketplace, ProductImage
 
 @ScraperRegistry.register(Marketplace.SHOPEE)
 class ShopeeScraper(BaseScraper):
     marketplace = Marketplace.SHOPEE
     
     def validate_url(self, url: str) -> bool:
-        return "shopee" in url.lower()
+        return "shopee.com" in url.lower()
 
     async def scrape(self, url: str) -> Product:
-        async with httpx.AsyncClient(timeout=self.request_timeout, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=self.request_timeout, headers=self.common_headers, follow_redirects=True) as client:
             try:
                 r = await client.get(url)
                 r.raise_for_status()
-                html = r.text
             except Exception as e:
-                raise ScraperError(f"Falha ao acessar Shopee: {e}")
+                raise ScraperError(f"Shopee Block: {e}")
         
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(r.text, "html.parser")
         
-        # Pylance Fix: Garantir que title_tag e content não sejam None
         title_tag = soup.select_one("meta[property='og:title']")
-        name = str(title_tag.get("content")) if title_tag and title_tag.get("content") else "Produto Shopee"
+        name = str(title_tag.get("content", "Produto Shopee")) if title_tag else "Produto Shopee"
         
         price_tag = soup.select_one("meta[property='product:price:amount']")
         try:
-            # Converte com fallback seguro para 0.0
-            price_val = float(str(price_tag.get("content"))) if price_tag and price_tag.get("content") else 0.0
-        except (ValueError, TypeError):
+            price_val = float(str(price_tag.get("content", "0"))) if price_tag else 0.0
+        except:
             price_val = 0.0
         
+        img_tag = soup.select_one("meta[property='og:image']")
+        img_url = str(img_tag.get("content", "")) if img_tag else ""
+        images = [ProductImage(url=img_url, is_primary=True, position=0)] if img_url else []
+
         return Product(
             name=name,
             description="",
             price=ProductPrice(amount=price_val, currency="BRL"),
-            images=[],
-            features=[],
-            attributes=[],
-            rating=5.0,
-            review_count=0,
+            images=images,
+            rating=0.0,         # Campo obrigatório
+            review_count=0,     # Campo obrigatório
             seller_name="Vendedor Shopee",
-            seller_rating=5.0,
+            seller_rating=0.0,  # Campo obrigatório
             metadata=ProductMetadata(
-                marketplace=self.marketplace,
-                marketplace_id="shopee_id",
-                source_url=url,
-            ),
-            raw_data={}
+                marketplace=self.marketplace, 
+                source_url=url, 
+                marketplace_id=self.extract_product_id(url)
+            )
         )
