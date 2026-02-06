@@ -1,13 +1,14 @@
 import httpx
 from bs4 import BeautifulSoup
 from .base import BaseScraper, ScraperError
-from app.models.product import Product, Marketplace
+from app.models.product import Product, Marketplace, ProductPrice, ProductMetadata, ProductImage
 
 class GenericEcomScraper(BaseScraper):
     """Scraper genérico para E-commerce via BeautifulSoup."""
     
+    marketplace = Marketplace.CUSTOM
+
     def validate_url(self, url: str) -> bool:
-        # Aceita qualquer URL para fins de teste, ou refine a lógica
         return "http" in url
 
     async def scrape(self, url: str) -> Product:
@@ -18,17 +19,29 @@ class GenericEcomScraper(BaseScraper):
                 
             soup = BeautifulSoup(response.text, 'lxml')
             
-            # Lógica básica de extração (meta tags)
-            title = soup.find("meta", property="og:title")
-            price = soup.find("meta", property="product:price:amount")
-            image = soup.find("meta", property="og:image")
+            # Extração segura
+            og_title = soup.find("meta", property="og:title")
+            og_price = soup.find("meta", property="product:price:amount")
+            og_image = soup.find("meta", property="og:image")
 
+            name = str(og_title["content"]) if og_title and og_title.get("content") else "Produto Sem Nome"
+            price_val = float(og_price["content"]) if og_price and og_price.get("content") else 0.01
+
+            # Montagem do objeto respeitando o product.py
             return Product(
-                title=title["content"] if title else "Produto sem título",
-                price=float(price["content"]) if price else 0.0,
-                image_url=image["content"] if image else "",
-                original_url=url,
-                marketplace=Marketplace.GENERIC
+                name=name,
+                description=None,
+                price=ProductPrice(amount=price_val, currency="BRL"),
+                images=[ProductImage(url=str(og_image["content"]))] if og_image else [],
+                metadata=ProductMetadata(
+                    marketplace=self.marketplace,
+                    marketplace_id=self.extract_product_id(url),
+                    source_url=url
+                ),
+                rating=0.0,
+                review_count=0,
+                seller_rating=0.0,
+                is_available=True
             )
         except Exception as e:
             raise ScraperError(f"Falha ao extrair dados de {url}: {str(e)}")

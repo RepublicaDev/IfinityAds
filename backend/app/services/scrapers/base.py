@@ -1,6 +1,7 @@
 import logging
+import hashlib
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Type
+from typing import Optional, Dict, Type, List
 from app.models.product import Product, Marketplace
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
@@ -13,7 +14,8 @@ class ScraperError(Exception):
 class BaseScraper(ABC):
     """Interface abstrata (Strategy Pattern) para scrapers."""
     
-    marketplace: Marketplace = None
+    # Usamos o Marketplace.CUSTOM como fallback se o GENERIC não estiver no seu enum
+    marketplace: Marketplace = Marketplace.CUSTOM
     request_timeout: int = 20
     max_retries: int = 3
     
@@ -24,6 +26,10 @@ class BaseScraper(ABC):
     @abstractmethod
     def validate_url(self, url: str) -> bool:
         pass
+
+    def extract_product_id(self, url: str) -> str:
+        """Extrai ID único do produto via hash da URL (fallback)."""
+        return hashlib.md5(url.encode()).hexdigest()[:12]
     
     async def scrape_with_retry(self, url: str) -> Product:
         @retry(
@@ -52,3 +58,8 @@ class ScraperRegistry:
             if instance.validate_url(url):
                 return instance
         return None
+
+    @classmethod
+    def list_marketplaces(cls) -> List[Marketplace]:
+        """Retorna lista de marketplaces registrados."""
+        return list(cls._scrapers.keys())

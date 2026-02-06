@@ -2,45 +2,43 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from app.core.auth import get_current_user
 from app.services.orchestrator import AdOrchestrator
-from backend.app.core.tasks import process_job_task
+from app.core.tasks import process_job_task
+from typing import Any, cast, Optional
 import logging
+import asyncio
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
-
 
 class JobCreateRequest(BaseModel):
     product_url: str
-    youtube_url: str | None = None
-    style: str | None = "charismatic_fomo"
-
+    youtube_url: Optional[str] = None
+    style: str = "charismatic_fomo"
 
 @router.post("/jobs")
-async def create_job(req: JobCreateRequest, user=Depends(get_current_user)):
-    orchestrator = AdOrchestrator()
-    job_id = await orchestrator.enqueue_job(req.product_url, req.youtube_url, req.style, user.get("uid"))
+async def create_job(req: JobCreateRequest, user: Any = Depends(get_current_user)):
+    # Tipagem explícita ajuda o Pylance
+    orchestrator: AdOrchestrator = AdOrchestrator()
+    
+    user_id = "unknown"
+    if isinstance(user, dict):
+        user_id = str(user.get("uid") or user.get("id", "unknown"))
+    elif hasattr(user, "uid"):
+        user_id = str(user.uid)
 
-    # Enfileira tarefa no Celery
+    # Agora o Pylance encontrará o método porque o definimos no Service acima
+    job_id = await orchestrator.enqueue_job(
+        product_url=req.product_url, 
+        youtube_url=req.youtube_url, 
+        style=req.style, 
+        user_id=user_id
+    )
+
     try:
-        process_job_task.delay(job_id)
+        cast(Any, process_job_task).delay(job_id)
     except Exception as e:
-        logger.warning(f"Falha ao enfileirar no Celery, tentando execução local: {e}")
-        # Fallback: execute localmente em background
-        import asyncio
-        asyncio.create_task(orchestrator.process_job(job_id))
+        logger.warning(f"Falha no Celery, tentando execução local: {e}")
+        # Chamada corrigida: agora condiz com o Orchestrator
+        asyncio.create_task(orchestrator.process_job(job_id=job_id))
 
     return {"job_id": job_id, "status": "queued"}
-
-
-@router.get("/jobs/{job_id}")
-async def get_job(job_id: str, user=Depends(get_current_user)):
-    from app.db import db
-    if not db:
-        raise HTTPException(status_code=503, detail="Database não disponível")
-
-    doc = await db.render_logs.find_one({"job_id": job_id})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Job não encontrado")
-
-    return {"job_id": job_id, "status": doc.get("status"), "result": doc.get("result")}
