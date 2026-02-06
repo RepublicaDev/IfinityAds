@@ -1,14 +1,20 @@
-# --- Core API ---
+# --- Core API & Server ---
 fastapi==0.115.8
 uvicorn[standard]==0.34.0
 pydantic==2.10.6
 pydantic-settings==2.7.1
+python-multipart==0.0.20
 
 # --- Database & Auth ---
-# Motor 3.6.0+ é necessário para evitar o erro '_QUERY_OPTIONS' no Python 3.12
+# Motor 3.6.0+ para compatibilidade total com Python 3.12+
 motor==3.6.0
 pymongo==4.9.1
 firebase-admin==6.6.0
+dnspython==2.7.0
+
+# --- AI Services (O que faltava) ---
+replicate==1.0.4
+groq==0.18.0
 
 # --- Scraping & Tools ---
 youtube-transcript-api==0.6.3

@@ -1,11 +1,10 @@
 import httpx
 from bs4 import BeautifulSoup
+from typing import Any, Optional
 from .base import BaseScraper, ScraperError
 from app.models.product import Product, Marketplace, ProductPrice, ProductMetadata, ProductImage
 
 class GenericEcomScraper(BaseScraper):
-    """Scraper genérico para E-commerce via BeautifulSoup."""
-    
     marketplace = Marketplace.CUSTOM
 
     def validate_url(self, url: str) -> bool:
@@ -19,20 +18,23 @@ class GenericEcomScraper(BaseScraper):
                 
             soup = BeautifulSoup(response.text, 'lxml')
             
-            # Extração segura
-            og_title = soup.find("meta", property="og:title")
-            og_price = soup.find("meta", property="product:price:amount")
-            og_image = soup.find("meta", property="og:image")
+            # Usamos find().get() que é suportado pela interface do BS4
+            # mas acessamos de forma que o Pylance não tente validar o __getitem__
+            def get_meta(prop: str) -> Optional[str]:
+                tag: Any = soup.find("meta", property=prop)
+                return tag.get("content") if tag else None
 
-            name = str(og_title["content"]) if og_title and og_title.get("content") else "Produto Sem Nome"
-            price_val = float(og_price["content"]) if og_price and og_price.get("content") else 0.01
+            name = get_meta("og:title") or "Produto Sem Nome"
+            raw_price = get_meta("product:price:amount")
+            image_url = get_meta("og:image")
 
-            # Montagem do objeto respeitando o product.py
+            price_val = float(raw_price) if raw_price else 0.01
+
             return Product(
-                name=name,
+                name=str(name),
                 description=None,
                 price=ProductPrice(amount=price_val, currency="BRL"),
-                images=[ProductImage(url=str(og_image["content"]))] if og_image else [],
+                images=[ProductImage(url=str(image_url))] if image_url else [],
                 metadata=ProductMetadata(
                     marketplace=self.marketplace,
                     marketplace_id=self.extract_product_id(url),

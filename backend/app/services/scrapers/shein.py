@@ -1,13 +1,11 @@
 import httpx
 import json
 import hashlib
-from bs4 import BeautifulSoup
-from typing import Dict, Any
-from app.models.product import (
-    Product, ProductPrice, ProductMetadata, Marketplace
-)
-from . import BaseScraper, ScraperError
 import logging
+from bs4 import BeautifulSoup
+from typing import Dict, Any, Optional
+from app.models.product import Product, ProductPrice, ProductMetadata, Marketplace
+from . import BaseScraper, ScraperError
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +16,7 @@ class SheinScraper(BaseScraper):
         return "shein" in url.lower()
 
     def normalize_product(self, raw: Dict[str, Any], url: str) -> Product:
-        # Garantia de tipos para o Pylance
-        name = str(raw.get("name") or raw.get("title") or "Produto Shein")
+        name = str(raw.get("name") or "Produto Shein")
         price_val = float(raw.get("price") or 0.0)
         
         return Product(
@@ -27,18 +24,14 @@ class SheinScraper(BaseScraper):
             description=str(raw.get("description") or ""),
             price=ProductPrice(amount=price_val, currency="USD"),
             images=[],
-            features=[],
-            attributes=[],
             rating=float(raw.get("rating") or 0.0),
             review_count=int(raw.get("review_count") or 0),
-            seller_name="Shein Official",
             seller_rating=4.5,
             metadata=ProductMetadata(
                 marketplace=self.marketplace,
                 marketplace_id=hashlib.md5(url.encode()).hexdigest()[:12],
                 source_url=url,
-            ),
-            raw_data=raw
+            )
         )
 
     async def scrape(self, url: str) -> Product:
@@ -47,21 +40,25 @@ class SheinScraper(BaseScraper):
             r = await client.get(url)
             soup = BeautifulSoup(r.text, "html.parser")
         
-        # Tenta pegar dados estruturados (JSON-LD)
-        ld_json = soup.find("script", type="application/ld+json")
-        raw_data = {}
-        if ld_json and ld_json.string:
+        # Acessamos como Any para o Pylance parar de reclamar de .string e .text
+        ld_json: Any = soup.find("script", type="application/ld+json")
+        raw_data: Dict[str, Any] = {}
+        
+        if ld_json and hasattr(ld_json, 'string') and ld_json.string:
             try:
-                data = json.loads(ld_json.string)
-                # LD+JSON pode ser uma lista ou um objeto único
+                data = json.loads(str(ld_json.string))
                 product_data = data[0] if isinstance(data, list) else data
+                
+                offers = product_data.get("offers", {})
+                price = offers.get("price") if isinstance(offers, dict) else 0.0
+                
                 raw_data = {
                     "name": product_data.get("name"),
                     "description": product_data.get("description"),
-                    "price": product_data.get("offers", {}).get("price")
+                    "price": price
                 }
-            except: pass
+            except Exception:
+                logger.warning("Falha ao parsear JSON-LD da Shein")
 
         product = self.normalize_product(raw_data, url)
-        logger.info(f"✓ Shein: {product.name}")
         return product
