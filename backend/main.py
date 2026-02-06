@@ -1,54 +1,68 @@
 import uvicorn
 import os
-from fastapi import FastAPI, status
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from app.api.v1 import router as api_router
-from app.api.v2 import router as api_v2_router
+# Importamos o roteador central que unifica v1 e v2
+from app.api import router as api_root_router
 from app.db.db import db_wrapper
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # STARTUP: Conexão com o banco
     try:
         await db_wrapper.connect()
+        print("🚀 Conexão com o MongoDB estabelecida com sucesso.")
     except Exception as e:
-        print(f"Erro na conexão com Banco: {e}")
+        print(f"❌ Erro crítico na conexão com Banco: {e}")
+    
     yield
+    
+    # SHUTDOWN: Fechamento da conexão
     await db_wrapper.close()
+    print("💤 Conexão com o banco encerrada.")
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="IfinityAds Backend", lifespan=lifespan)
+    app = FastAPI(
+        title="IfinityAds API", 
+        description="Backend centralizado para análise de produtos e anúncios",
+        version="1.0.0",
+        lifespan=lifespan
+    )
 
-    # CONFIGURAÇÃO DE CORS TOTAL
-    # Usar allow_origins=["*"] é a forma mais segura de garantir que 
-    # URLs de preview da Vercel funcionem sem erro.
+    # 1. CONFIGURAÇÃO DE CORS TOTAL
+    # O uso do "*" é necessário para aceitar as URLs de Preview da Vercel
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"], 
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["*"]
     )
 
-    # Rotas de Saúde com suporte a múltiplos caminhos
-    @app.get("/health")
-    @app.get("/api/v1/health")
-    async def health_check():
-        return {"status": "healthy"}
+    # 2. ROTAS DE SAÚDE (HEALTH CHECK)
+    # Registradas em múltiplos caminhos para garantir que o Render e o Front encontrem
+    @app.get("/health", tags=["System"])
+    @app.get("/api/v1/health", tags=["System"])
+    async def health():
+        return {"status": "online", "environment": os.getenv("ENVIRONMENT", "production")}
 
-    # Roteamento
-    # Incluímos o router v1 com e sem prefixo para bater com as chamadas do seu front
-    app.include_router(api_router, prefix="/api/v1", tags=["v1"])
-    app.include_router(api_router, tags=["v1-compat"])
-    app.include_router(api_v2_router, prefix="/api/v2", tags=["v2"])
+    # 3. INCLUSÃO DO ROTEADOR UNIFICADO
+    # Isso registra automaticamente /api/v1/... e /api/v2/...
+    app.include_router(api_root_router, prefix="/api")
+
+    # 4. COMPATIBILIDADE EXTRA
+    # Caso seu frontend esteja chamando diretamente /products/scrape sem o /api/v1
+    from app.api.v1 import router as v1_router
+    app.include_router(v1_router, tags=["Compatibility"])
 
     return app
 
 app = create_app()
 
 if __name__ == "__main__":
+    # O Render injeta automaticamente a porta na variável de ambiente PORT
     port = int(os.getenv("PORT", 8000))
-    # Passamos o objeto app diretamente
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False)
