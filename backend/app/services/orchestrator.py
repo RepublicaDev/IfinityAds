@@ -1,9 +1,8 @@
 import logging
 from datetime import datetime
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, cast
 from bson import ObjectId
 
-# Importamos o wrapper em vez da variável 'db' solta
 from app.db.db import db_wrapper
 from app.services.llm_service import LLMService
 from app.services.video_did import DIDService
@@ -18,8 +17,10 @@ class AdOrchestrator:
         self.sadtalker_service = SadTalkerService()
 
     @property
-    def db(self):
-        """Acesso dinâmico ao banco de dados através do wrapper."""
+    def db(self) -> Any:
+        """Retorna a base de dados do MongoDB com fallback para evitar erros de Pylance."""
+        if db_wrapper.database is None:
+            raise RuntimeError("Banco de dados não inicializado. Chame connect() primeiro.")
         return db_wrapper.database
 
     async def enqueue_job(self, product_url: str, youtube_url: Optional[str], style: str, user_id: str) -> str:
@@ -33,42 +34,50 @@ class AdOrchestrator:
             "updated_at": datetime.utcnow()
         }
         
-        # Uso do self.db (que aponta para db_wrapper.database)
-        result = await self.db.jobs.insert_one(job_data)
+        # O Pylance pode reclamar se não fizermos o cast ou acesso dinâmico
+        result = await self.db["jobs"].insert_one(job_data)
         job_id = str(result.inserted_id)
         
-        logger.info(f"Job {job_id} persistido para o usuário {user_id}")
+        logger.info(f"Job {job_id} enfileirado para o usuário {user_id}")
         return job_id
 
-    async def process_job(self, job_id: str, product_url: Optional[str] = None):
+    async def process_job(self, job_id: str):
+        """Orquestra o fluxo: Scraper -> LLM -> Video Service"""
         try:
             # 1. Recupera do Banco
-            job_doc = await self.db.jobs.find_one({"_id": ObjectId(job_id)})
+            job_doc = await self.db["jobs"].find_one({"_id": ObjectId(job_id)})
             if not job_doc:
                 logger.error(f"Job {job_id} não encontrado")
                 return
 
-            # 2. Atualiza status
-            await self.db.jobs.update_one(
+            # 2. Atualiza para Processando
+            await self.db["jobs"].update_one(
                 {"_id": ObjectId(job_id)}, 
                 {"$set": {"status": "processing", "updated_at": datetime.utcnow()}}
             )
             
-            # --- Lógica de IA aqui ---
-            # Ex: script = await self.llm.generate(...)
-
-            # 3. Finaliza com sucesso
-            await self.db.jobs.update_one({"_id": ObjectId(job_id)}, {
+            # --- FLUXO DE IA ---
+            # Aqui você deve integrar com o Scraper e o Analyzer que já funcionam
+            # script = await self.llm.generate_script(job_doc['product_url'], style=job_doc['style'])
+            # video_data = await self.did_service.create_talk("AVATAR_URL", script)
+            
+            # 3. Finaliza com sucesso (Exemplo)
+            await self.db["jobs"].update_one({"_id": ObjectId(job_id)}, {
                 "$set": {
                     "status": "completed", 
-                    "result_url": "URL_FINAL_AQUI",
+                    "result_url": "URL_DO_VIDEO_GERADO",
                     "updated_at": datetime.utcnow()
                 }
             })
+            logger.info(f"✓ Job {job_id} concluído com sucesso.")
             
         except Exception as e:
-            logger.error(f"Falha no processamento: {e}")
-            await self.db.jobs.update_one(
+            logger.error(f"❌ Falha no processamento do Job {job_id}: {e}")
+            await self.db["jobs"].update_one(
                 {"_id": ObjectId(job_id)}, 
-                {"$set": {"status": "failed", "error": str(e)}}
+                {"$set": {
+                    "status": "failed", 
+                    "error": str(e),
+                    "updated_at": datetime.utcnow()
+                }}
             )
