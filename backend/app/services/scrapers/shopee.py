@@ -4,11 +4,12 @@ from typing import Dict, Any
 from app.models.product import (
     Product, ProductPrice, ProductMetadata, Marketplace
 )
-from . import BaseScraper, ScraperError
+from .base import BaseScraper, ScraperError, ScraperRegistry # <--- IMPORTANTE
 import logging
 
 logger = logging.getLogger(__name__)
 
+@ScraperRegistry.register(Marketplace.SHOPEE)
 class ShopeeScraper(BaseScraper):
     marketplace = Marketplace.SHOPEE
     

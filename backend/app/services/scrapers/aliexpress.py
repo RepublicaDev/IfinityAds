@@ -12,11 +12,12 @@ from app.models.product import (
     Product, ProductPrice, ProductImage, ProductAttribute,
     ProductMetadata, Marketplace
 )
-from . import BaseScraper, ScraperError
+from .base import BaseScraper, ScraperError, ScraperRegistry # <--- IMPORTANTE
 import logging
 
 logger = logging.getLogger(__name__)
 
+@ScraperRegistry.register(Marketplace.ALIEXPRESS)
 class AliExpressScraper(BaseScraper):
     """Scraper para AliExpress com parsing de JS dinâmico."""
     

@@ -5,10 +5,11 @@ import logging
 from bs4 import BeautifulSoup
 from typing import Dict, Any, Optional
 from app.models.product import Product, ProductPrice, ProductMetadata, Marketplace
-from . import BaseScraper, ScraperError
+from .base import BaseScraper, ScraperError, ScraperRegistry # <--- IMPORTANTE
 
 logger = logging.getLogger(__name__)
 
+@ScraperRegistry.register(Marketplace.SHEIN)
 class SheinScraper(BaseScraper):
     marketplace = Marketplace.SHEIN
     

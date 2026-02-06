@@ -1,9 +1,10 @@
 import httpx
 from bs4 import BeautifulSoup
 from typing import Any, Optional
-from .base import BaseScraper, ScraperError
+from .base import BaseScraper, ScraperError, ScraperRegistry # <--- IMPORTANTE
 from app.models.product import Product, Marketplace, ProductPrice, ProductMetadata, ProductImage
 
+@ScraperRegistry.register(Marketplace.CUSTOM)
 class GenericEcomScraper(BaseScraper):
     marketplace = Marketplace.CUSTOM
 

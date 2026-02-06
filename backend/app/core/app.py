@@ -15,7 +15,7 @@ async def lifespan(app: FastAPI):
     await cache.connect()
     
     # Registro manual dos scrapers (Substitui o .initialize que dava erro)
-    ScraperRegistry.register(Marketplace.CUSTOM, GenericEcomScraper)
+    #ScraperRegistry.register(Marketplace.CUSTOM, GenericEcomScraper)
     
     logger.info("✓ Backend pronto para receber requisições")
     yield
